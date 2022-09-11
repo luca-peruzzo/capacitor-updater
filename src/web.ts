@@ -61,6 +61,10 @@ export class CapacitorUpdaterWeb
     console.warn('Cannot notify App Ready in web');
     return BUNDLE_BUILTIN;
   }
+  async setMultiDelay(options: { kind: DelayUntilNext, value: string }[]): Promise<void> {
+    console.warn('Cannot setMultiDelay in web', options);
+    return;
+  }
   async setDelay(options: { kind: DelayUntilNext, value: string }): Promise<void> {
     console.warn('Cannot setDelay in web', options);
     return;

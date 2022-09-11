@@ -161,6 +161,11 @@ export interface BundleInfo {
   status: BundleStatus
 }
 
+export interface DelayCondition {
+  kind: DelayUntilNext,
+  value?: string
+}
+
 export type BundleStatus = 'success' | 'error' | 'pending' | 'downloading';
 export type DelayUntilNext = 'background' | 'kill' | 'nativeVersion' | 'date';
 
@@ -256,15 +261,25 @@ export interface CapacitorUpdaterPlugin {
   reload(): Promise<void>;
 
   /**
-   * Set delay to skip updates in the next time the app goes into the background
+   * Set DelayCondition, skip updates until one of the condition is met
    *
    * @returns {Promise<void>} an Promise resolved directly
-   * @param kind is the kind of delay to set
-   * @param value is the delay value acording to the type
+   * @param DelayCondition is the kind of delay to set
    * @throws An error if the something went wrong
    * @since 4.0.0
    */
-  setDelay(options: {kind: DelayUntilNext, value?: string}): Promise<void>;
+  setMultiDelay(options: DelayCondition[]): Promise<void>;
+
+  /**
+   * Set DelayCondition, skip updates until the condition is met
+   *
+   * @deprecated use setMultiDelay instead passing a single value
+   * @returns {Promise<void>} an Promise resolved directly
+   * @param DelayCondition is the kind of delay to set
+   * @throws An error if the something went wrong
+   * @since 4.0.0
+   */
+   setDelay(options: DelayCondition): Promise<void>;
 
   /**
    * Cancel delay to updates as usual
