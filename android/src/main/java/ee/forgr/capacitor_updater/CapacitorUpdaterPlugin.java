@@ -24,9 +24,9 @@ import com.getcapacitor.plugin.WebView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import io.github.g00fy2.versioncompare.Version;
-
 import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -35,12 +35,11 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
+
+import io.github.g00fy2.versioncompare.Version;
 
 @CapacitorPlugin(name = "CapacitorUpdater")
 public class CapacitorUpdaterPlugin extends Plugin implements Application.ActivityLifecycleCallbacks {
@@ -407,7 +406,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
         try {
             final BundleInfo bundle = this.implementation.getCurrentBundle();
             this.implementation.setSuccess(bundle, this.autoDeletePrevious);
-            Log.i(CapacitorUpdater.TAG, "Current bundle loaded successfully. ['notifyAppReady()' was called] " + bundle.toString());
+            Log.i(CapacitorUpdater.TAG, "Current bundle loaded successfully. ['notifyAppReady()' was called] " + bundle);
             call.resolve();
         } catch (final Exception e) {
             Log.e(CapacitorUpdater.TAG, "Failed to notify app ready state. [Error calling 'notifyAppReady()']", e);
@@ -418,14 +417,13 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
     @PluginMethod
     public void setMultiDelay(final PluginCall call) {
         try {
-            final JSArray delayConditionList = call.getArray("delayConditions");
-            if (delayConditionList == null || delayConditionList.length() == 0) {
+            final Object delayConditions = call.getData().opt("delayConditions");
+            if (delayConditions == null) {
                 Log.e(CapacitorUpdater.TAG, "setMultiDelay called without delayCondition");
                 call.reject("setMultiDelay called without delayCondition");
                 return;
             }
-            Gson gson = new Gson();
-            this.editor.putString(DELAY_CONDITION_PREFERENCES, gson.toJson(delayConditionList));
+            this.editor.putString(DELAY_CONDITION_PREFERENCES, delayConditions.toString());
             this.editor.commit();
             Log.i(CapacitorUpdater.TAG, "Delay update saved");
             call.resolve();
@@ -438,7 +436,17 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
     @Deprecated
     @PluginMethod
     public void setDelay(final PluginCall call) {
-        setMultiDelay(call);
+        try {
+            DelayUntilNext kind = DelayUntilNext.valueOf(call.getString("kind"));
+            String value = call.getString("value");
+            JSONObject json = new JSONObject(new JSONTokener("{\"delayConditions\":[{\"kind\":\"" + kind + "\", \"value\":\"" + (value != null ? value : "") + "\"}]}"));
+            JSObject fromJSONObject = JSObject.fromJSONObject(json);
+            call.resolve(fromJSONObject);
+            setMultiDelay(call);
+        } catch (final Exception e) {
+            Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
+            call.reject("Failed to delay update", e);
+        }
     }
 
     private boolean _cancelDelay(String source) {
@@ -464,7 +472,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
 
     private void _checkCancelDelay(Boolean killed) {
         Gson gson = new Gson();
-        String delayUpdatePreferences = prefs.getString(DELAY_CONDITION_PREFERENCES, "");
+        String delayUpdatePreferences = prefs.getString(DELAY_CONDITION_PREFERENCES, "[]");
         Type type = new TypeToken<ArrayList<DelayCondition>>() {
         }.getType();
         ArrayList<DelayCondition> delayConditionList = gson.fromJson(delayUpdatePreferences, type);
@@ -472,34 +480,49 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             String kind = condition.getKind().toString();
             String value = condition.getValue();
             if (!"".equals(kind)) {
-                if ("background".equals(kind) && !killed) {
-                    this._cancelDelay("background check");
-                } else if ("kill".equals(kind) && killed) {
-                    this._cancelDelay("kill check");
-                } else if (("date".equals(kind) || "nativeVersion".equals(kind)) && !"".equals(value)) {
-                    if ("date".equals(kind)) {
-                        try {
-                            final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-                            Date date = sdf.parse(value);
-                            if (date.compareTo(new Date()) > 0) {
-                                this._cancelDelay("date expired");
-                            }
-                        } catch (final Exception e) {
-                            this._cancelDelay("date parsing issue");
+                switch (kind) {
+                    case "background":
+                        if (!killed) {
+                            this._cancelDelay("background check");
                         }
-
-                    } else {
-                        try {
-                            final Version versionLimit = new Version(value);
-                            if (this.currentVersionNative.isAtLeast(versionLimit)) {
-                                this._cancelDelay("nativeVersion above limit");
-                            }
-                        } catch (final Exception e) {
-                            this._cancelDelay("nativeVersion parsing issue");
+                        break;
+                    case "kill":
+                        if (killed) {
+                            this._cancelDelay("kill check");
                         }
-                    }
-                } else {
-                    this._cancelDelay("delayVal absent");
+                        break;
+                    case "date":
+                        if (!"".equals(value)) {
+                            try {
+                                final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+                                Date date = sdf.parse(value);
+                                assert date != null;
+                                System.out.println(date);
+                                System.out.println(new Date());
+                                if (new Date().compareTo(date) > 0) {
+                                    this._cancelDelay("date expired");
+                                }
+                            } catch (final Exception e) {
+                                this._cancelDelay("date parsing issue");
+                            }
+                        } else {
+                            this._cancelDelay("delayVal absent");
+                        }
+                        break;
+                    case "nativeVersion":
+                        if (!"".equals(value)) {
+                            try {
+                                final Version versionLimit = new Version(value);
+                                if (this.currentVersionNative.isAtLeast(versionLimit)) {
+                                    this._cancelDelay("nativeVersion above limit");
+                                }
+                            } catch (final Exception e) {
+                                this._cancelDelay("nativeVersion parsing issue");
+                            }
+                        } else {
+                            this._cancelDelay("delayVal absent");
+                        }
+                        break;
                 }
             }
         }
@@ -644,7 +667,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
         Log.i(CapacitorUpdater.TAG, "Checking for pending update");
         try {
             Gson gson = new Gson();
-            String delayUpdatePreferences = prefs.getString(DELAY_CONDITION_PREFERENCES, "");
+            String delayUpdatePreferences = prefs.getString(DELAY_CONDITION_PREFERENCES, "[]");
             Type type = new TypeToken<ArrayList<DelayCondition>>() {
             }.getType();
             ArrayList<DelayCondition> delayConditionList = gson.fromJson(delayUpdatePreferences, type);
