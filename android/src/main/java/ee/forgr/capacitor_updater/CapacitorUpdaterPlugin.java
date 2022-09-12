@@ -37,6 +37,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import io.github.g00fy2.versioncompare.Version;
@@ -497,8 +499,6 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                                 final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
                                 Date date = sdf.parse(value);
                                 assert date != null;
-                                System.out.println(date);
-                                System.out.println(new Date());
                                 if (new Date().compareTo(date) > 0) {
                                     this._cancelDelay("date expired");
                                 }
@@ -671,7 +671,38 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             Type type = new TypeToken<ArrayList<DelayCondition>>() {
             }.getType();
             ArrayList<DelayCondition> delayConditionList = gson.fromJson(delayUpdatePreferences, type);
-            this._checkCancelDelay(false);
+            String backgroundValue = null;
+            for(DelayCondition delayCondition : delayConditionList) {
+                if(delayCondition.getKind().toString().equals("background")) {
+                    String value = delayCondition.getValue();
+                    backgroundValue = (value != null || !value.equals("")) ? value : "0";
+                }
+            }
+            if(backgroundValue != null) {
+                Timer timer = new Timer();
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        _checkCancelDelay(false);
+                        installNext();
+                    }
+                }, Long.parseLong(backgroundValue));
+            } else {
+                this._checkCancelDelay(false);
+                this.installNext();
+            }
+        } catch (final Exception e) {
+            Log.e(CapacitorUpdater.TAG, "Error during onActivityStopped", e);
+        }
+    }
+
+    private void installNext() {
+        try {
+            Gson gson = new Gson();
+            String delayUpdatePreferences = prefs.getString(DELAY_CONDITION_PREFERENCES, "[]");
+            Type type = new TypeToken<ArrayList<DelayCondition>>() {
+            }.getType();
+            ArrayList<DelayCondition> delayConditionList = gson.fromJson(delayUpdatePreferences, type);
             if (delayConditionList != null && delayConditionList.size() != 0) {
                 Log.i(CapacitorUpdater.TAG, "Update delayed to next backgrounding");
                 return;
