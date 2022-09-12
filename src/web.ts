@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { CapacitorUpdaterPlugin, BundleInfo, latestVersion, DelayUntilNext } from './definitions';
+import type { CapacitorUpdaterPlugin, BundleInfo, latestVersion, DelayCondition } from './definitions';
 
 const BUNDLE_BUILTIN: BundleInfo = { status: 'success', version: '', downloaded: '1970-01-01T00:00:00.000Z', id: 'builtin', checksum: "" };
 
@@ -61,12 +61,12 @@ export class CapacitorUpdaterWeb
     console.warn('Cannot notify App Ready in web');
     return BUNDLE_BUILTIN;
   }
-  async setMultiDelay(options: { kind: DelayUntilNext, value: string }[]): Promise<void> {
-    console.warn('Cannot setMultiDelay in web', options);
+  async setMultiDelay(options: {delayConditions: DelayCondition[]}): Promise<void> {
+    console.warn('Cannot setMultiDelay in web', options?.delayConditions);
     return;
   }
-  async setDelay(options: { kind: DelayUntilNext, value: string }): Promise<void> {
-    console.warn('Cannot setDelay in web', options);
+  async setDelay(option: DelayCondition): Promise<void> {
+    console.warn('Cannot setDelay in web', option);
     return;
   }
   async cancelDelay(): Promise<void> {

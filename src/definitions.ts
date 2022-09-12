@@ -268,7 +268,7 @@ export interface CapacitorUpdaterPlugin {
    * @throws An error if the something went wrong
    * @since 4.0.0
    */
-  setMultiDelay(options: DelayCondition[]): Promise<void>;
+  setMultiDelay(options: {delayConditions: DelayCondition[]}): Promise<void>;
 
   /**
    * Set DelayCondition, skip updates until the condition is met
@@ -279,7 +279,7 @@ export interface CapacitorUpdaterPlugin {
    * @throws An error if the something went wrong
    * @since 4.0.0
    */
-   setDelay(options: DelayCondition): Promise<void>;
+   setDelay(option: DelayCondition): Promise<void>;
 
   /**
    * Cancel delay to updates as usual

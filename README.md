@@ -283,14 +283,14 @@ Reload the view
 ### setMultiDelay(...)
 
 ```typescript
-setMultiDelay(options: DelayCondition[]) => Promise<void>
+setMultiDelay(options: { delayConditions: DelayCondition[]; }) => Promise<void>
 ```
 
 Set <a href="#delaycondition">DelayCondition</a>, skip updates until one of the condition is met
 
-| Param         | Type                          |
-| ------------- | ----------------------------- |
-| **`options`** | <code>DelayCondition[]</code> |
+| Param         | Type                                                |
+| ------------- | --------------------------------------------------- |
+| **`options`** | <code>{ delayConditions: DelayCondition[]; }</code> |
 
 **Since:** 4.0.0
 
@@ -300,14 +300,14 @@ Set <a href="#delaycondition">DelayCondition</a>, skip updates until one of the 
 ### setDelay(...)
 
 ```typescript
-setDelay(options: DelayCondition) => Promise<void>
+setDelay(option: DelayCondition) => Promise<void>
 ```
 
 Set <a href="#delaycondition">DelayCondition</a>, skip updates until the condition is met
 
-| Param         | Type                                                      |
-| ------------- | --------------------------------------------------------- |
-| **`options`** | <code><a href="#delaycondition">DelayCondition</a></code> |
+| Param        | Type                                                      |
+| ------------ | --------------------------------------------------------- |
+| **`option`** | <code><a href="#delaycondition">DelayCondition</a></code> |
 
 **Since:** 4.0.0
 
