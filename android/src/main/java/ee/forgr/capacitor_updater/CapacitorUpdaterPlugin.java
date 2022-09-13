@@ -61,8 +61,9 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
     private String updateUrl = "";
     private Version currentVersionNative;
     private Boolean resetWhenUpdate = true;
-    private Timer backgroundTimer = new Timer();
+    private final Timer backgroundTimer = new Timer();
     private TimerTask backgroundTask;
+    private Boolean taskRunning = false;
 
     private volatile Thread appReadyCheck;
 
@@ -101,7 +102,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
         this.implementation.versionOs = Build.VERSION.RELEASE;
         this.implementation.deviceID = this.prefs.getString("appUUID", UUID.randomUUID().toString());
         this.editor.putString("appUUID", this.implementation.deviceID);
-        Log.e(CapacitorUpdater.TAG, "init for device " + this.implementation.deviceID);
+        Log.i(CapacitorUpdater.TAG, "init for device " + this.implementation.deviceID);
 
         this.autoDeleteFailed = this.getConfig().getBoolean("autoDeleteFailed", true);
         this.autoDeletePrevious = this.getConfig().getBoolean("autoDeletePrevious", true);
@@ -220,8 +221,8 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                 }
             }).start();
         } catch (final Exception e) {
-            Log.e(CapacitorUpdater.TAG, "Failed to download " + url, e);
-            call.reject("Failed to download " + url, e);
+            Log.e(CapacitorUpdater.TAG, "Failed to download from: " + url, e);
+            call.reject("Failed to download from: " + url, e);
         }
     }
 
@@ -270,7 +271,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             }
         } catch (final Exception e) {
             Log.e(CapacitorUpdater.TAG, "Could not set next id " + id, e);
-            call.reject("Could not set next id " + id, e);
+            call.reject("Could not set next id: " + id, e);
         }
     }
 
@@ -288,7 +289,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                 Log.i(CapacitorUpdater.TAG, "No such bundle " + id);
                 call.reject("Update failed, id " + id + " does not exist.");
             } else {
-                Log.i(CapacitorUpdater.TAG, "Bundle successfully set to" + id);
+                Log.i(CapacitorUpdater.TAG, "Bundle successfully set to " + id);
                 this.reload(call);
             }
         } catch (final Exception e) {
@@ -305,7 +306,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             call.reject("missing id");
             return;
         }
-        Log.i(CapacitorUpdater.TAG, "Deleting id: " + id);
+        Log.i(CapacitorUpdater.TAG, "Deleting id " + id);
         try {
             final Boolean res = this.implementation.delete(id);
             if (res) {
@@ -427,13 +428,13 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                 call.reject("setMultiDelay called without delayCondition");
                 return;
             }
-            if (_setMultiDelay(delayConditions.toString())){
+            if (_setMultiDelay(delayConditions.toString())) {
                 call.resolve();
-            }else {
+            } else {
                 call.reject("Failed to delay update");
             }
         } catch (final Exception e) {
-            Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
+            Log.e(CapacitorUpdater.TAG, "Failed to delay update, [Error calling 'setMultiDelay()']", e);
             call.reject("Failed to delay update", e);
         }
     }
@@ -445,7 +446,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             Log.i(CapacitorUpdater.TAG, "Delay update saved");
             return true;
         } catch (final Exception e) {
-            Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
+            Log.e(CapacitorUpdater.TAG, "Failed to delay update, [Error calling '_setMultiDelay()']", e);
             return false;
         }
     }
@@ -457,13 +458,13 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             DelayUntilNext kind = DelayUntilNext.valueOf(call.getString("kind"));
             String value = call.getString("value");
             String delayConditions = "[{\"kind\":\"" + kind + "\", \"value\":\"" + (value != null ? value : "") + "\"}]";
-            if (_setMultiDelay(delayConditions)){
+            if (_setMultiDelay(delayConditions)) {
                 call.resolve();
-            }else {
+            } else {
                 call.reject("Failed to delay update");
             }
         } catch (final Exception e) {
-            Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
+            Log.e(CapacitorUpdater.TAG, "Failed to delay update, [Error calling 'setDelay()']", e);
             call.reject("Failed to delay update", e);
         }
     }
@@ -626,7 +627,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                                         return;
                                     }
                                     if (latest.isDownloaded()) {
-                                        Log.e(CapacitorUpdater.TAG, "Latest bundle already exists and download is NOT required. Update will occur next time app moves to background.");
+                                        Log.i(CapacitorUpdater.TAG, "Latest bundle already exists and download is NOT required. Update will occur next time app moves to background.");
                                         final JSObject ret = new JSObject();
                                         ret.put("bundle", latest.toJSON());
                                         CapacitorUpdaterPlugin.this.notifyListeners("updateAvailable", ret);
@@ -696,9 +697,11 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                 }
             }
             if (backgroundValue != null) {
+                taskRunning = true;
                 backgroundTask = new TimerTask() {
                     @Override
                     public void run() {
+                        taskRunning = false;
                         _checkCancelDelay(false);
                         installNext();
                     }
@@ -793,7 +796,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
 
     @Override
     public void onActivityResumed(@NonNull final Activity activity) {
-        if (backgroundTask != null) {
+        if (backgroundTask != null && taskRunning) {
             backgroundTask.cancel();
             Log.i(CapacitorUpdater.TAG, "Background Timer Task canceled, Activity resumed before timer completes");
         }
@@ -801,7 +804,6 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
 
     @Override
     public void onActivityPaused(@NonNull final Activity activity) {
-        // TODO: Implement background updating based on `backgroundUpdate` and `backgroundUpdateDelay` capacitor.config.ts settings
     }
 
     @Override
