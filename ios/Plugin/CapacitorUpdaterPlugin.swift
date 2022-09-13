@@ -21,6 +21,8 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     private var resetWhenUpdate = true
     private var autoDeleteFailed = false
     private var autoDeletePrevious = false
+    private var backgroundWork: DispatchWorkItem?
+    private var taskRunning = false;
     
     override public func load() {
         print("\(self.implementation.TAG) init for device \(self.implementation.deviceID)")
@@ -241,20 +243,41 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     }
     
     @objc func setMultiDelay(_ call: CAPPluginCall) {
-        guard let delayConditions = call.getArray("delayConditions") else {
+        guard let delayConditionList = call.getValue("delayConditions") else {
             print("\(self.implementation.TAG) setMultiDelay called without delayCondition");
             call.reject("setMultiDelay called without delayCondition");
             return;
         }
-        let parsedDelayConditions: String = toJson(object: delayConditions)
-        UserDefaults.standard.set(parsedDelayConditions, forKey: DELAY_CONDITION_PREFERENCES)
-        UserDefaults.standard.synchronize()
-        print("\(self.implementation.TAG) Delay update saved.")
-        call.resolve()
+        let delayConditions: String = toJson(object: delayConditionList)
+        if(_setMultiDelay(delayConditions: delayConditions)){
+            call.resolve()
+        }else{
+            call.reject("Failed to delay update")
+        }
     }
     
+    @available(*, deprecated, message: "use SetMultiDelay instead")
     @objc func setDelay(_ call: CAPPluginCall) {
-        setMultiDelay(call)
+        let kind: String = call.getString("kind", "")
+        let value: String? = call.getString("value", "")
+        let delayConditions: String = "[{\"kind\":\"\(kind)\", \"value\":\"\(value ?? "")\"}]"
+        if(_setMultiDelay(delayConditions: delayConditions)){
+            call.resolve()
+        }else{
+            call.reject("Failed to delay update")
+        }
+    }
+    
+    private func _setMultiDelay(delayConditions: String?) -> Bool{
+        if(delayConditions != nil && "" != delayConditions) {
+            UserDefaults.standard.set(delayConditions, forKey: DELAY_CONDITION_PREFERENCES)
+            UserDefaults.standard.synchronize()
+            print("\(self.implementation.TAG) Delay update saved.")
+            return true
+        } else {
+            print("\(self.implementation.TAG) Failed to delay update, [Error calling '_setMultiDelay()']")
+            return false
+        }
     }
     
     private func _cancelDelay(source: String) -> Void {
@@ -269,20 +292,29 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     }
     
     private func _checkCancelDelay(killed: Bool) -> Void {
-        guard let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) else {
-            print()
+        let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) ?? "[]"
+        let delayConditionList:[DelayCondition] = fromJsonArr(json: delayUpdatePreferences).map { obj -> DelayCondition in
+            let kind: String = obj.value(forKey: "kind") as! String
+            let value: String? = obj.value(forKey: "value") as? String
+            return DelayCondition(kind: kind, value: value)
         }
-        let preferences:[DelayCondition] = fromJsonArr(json: delayUpdatePreferences) as! [DelayCondition]
-        for pref in preferences{
-            let kind: String? = pref.getKind()
-            let value: String? = pref.getValue()
+        for condition in delayConditionList {
+            let kind: String? = condition.getKind()
+            let value: String? = condition.getValue()
             if(kind != nil){
-                if (kind == "background" && !killed) {
-                    self._cancelDelay(source: "background check")
-                }else if (kind == "kill" && killed) {
-                    self._cancelDelay(source: "kill check")
-                }else if ((kind == "date" || kind=="nativeVersion") && value != nil){
-                    if (kind == "date") {
+                switch(kind){
+                case "background":
+                    if (!killed) {
+                        self._cancelDelay(source: "background check")
+                    }
+                    break;
+                case "kill":
+                    if (killed) {
+                        self._cancelDelay(source: "kill check")
+                    }
+                    break;
+                case "date":
+                    if(value != nil && value != ""){
                         let dateFormatter = ISO8601DateFormatter()
                         guard let ExpireDate = dateFormatter.date(from: value!) else {
                             self._cancelDelay(source: "date parsing issue")
@@ -291,7 +323,12 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
                         if (ExpireDate < Date())  {
                             self._cancelDelay(source: "date expired")
                         }
-                    } else if (kind == "nativeVersion") {
+                    }else {
+                        self._cancelDelay(source: "delayVal absent");
+                    }
+                    break;
+                case "nativeVersion":
+                    if(value != nil && value != ""){
                         do {
                             let versionLimit = try Version(value!)
                             if (self.currentVersionNative >= versionLimit) {
@@ -300,13 +337,18 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
                         } catch {
                             self._cancelDelay(source: "nativeVersion parsing issue")
                         }
+                    }else {
+                        self._cancelDelay(source: "delayVal absent");
                     }
-                }else{
-                    self._cancelDelay(source: "delayVal absent")
+                    break;
+                case .none:
+                    print("\(self.implementation.TAG) _checkCancelDelay switch case none error")
+                case .some(_):
+                    print("\(self.implementation.TAG) _checkCancelDelay switch case some error")
                 }
             }
         }
-        self.checkAppReady()
+        // self.checkAppReady() why this here?
     }
     
     private func _isAutoUpdateEnabled() -> Bool {
@@ -367,6 +409,10 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     }
     
     @objc func appMovedToForeground() {
+        if (backgroundWork != nil && taskRunning) {
+            backgroundWork!.cancel();
+            print("\(self.implementation.TAG) Background Timer Task canceled, Activity resumed before timer completes");
+        }
         if (self._isAutoUpdateEnabled()) {
             DispatchQueue.global(qos: .background).async {
                 print("\(self.implementation.TAG) Check for update via \(self.updateUrl)")
@@ -426,17 +472,51 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     
     @objc func appMovedToBackground() {
         print("\(self.implementation.TAG) Check for pending update")
-        guard let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) else {
-            print("\(self.implementation.TAG) Check for pending update")
-            return
+        let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) ?? "[]"
+  
+        let delayConditionList:[DelayCondition] = fromJsonArr(json: delayUpdatePreferences).map { obj -> DelayCondition in
+            let kind: String = obj.value(forKey: "kind") as! String
+            let value: String? = obj.value(forKey: "value") as? String
+            return DelayCondition(kind: kind, value: value)
         }
-        let delayConditionList = fromJsonArr(json: delayUpdatePreferences)
-        self._checkCancelDelay(killed: false)
-        if (delayConditionList != nil && delayConditionList.capacity != 0) {
+        var backgroundValue: String?
+        for delayCondition in delayConditionList {
+            if(delayCondition.getKind() == "background") {
+                let value: String? = delayCondition.getValue()
+                backgroundValue = (value != nil && value != "") ? value! : "0"
+            }
+        }
+        if(backgroundValue != nil){
+            self.taskRunning = true
+            let interval: Double = (Double(backgroundValue!) ?? 0.0) / 1000
+            self.backgroundWork?.cancel()
+            self.backgroundWork = DispatchWorkItem(block: {
+                // IOS never executes this task in background
+                self.taskRunning = false
+                self._checkCancelDelay(killed: false)
+                self.installNext()
+            })
+            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + interval, execute: self.backgroundWork!)
+        }else{
+            self._checkCancelDelay(killed: false);
+            self.installNext()
+        }
+        
+        
+        
+    }
+    
+    private func installNext(){
+        let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) ?? "[]"
+        let delayConditionList:[DelayCondition]? = fromJsonArr(json: delayUpdatePreferences).map { obj -> DelayCondition in
+            let kind: String = obj.value(forKey: "kind") as! String
+            let value: String? = obj.value(forKey: "value") as? String
+            return DelayCondition(kind: kind, value: value)
+        }
+        if (delayConditionList != nil && delayConditionList?.capacity != 0) {
             print("\(self.implementation.TAG) Update delayed to next backgrounding")
             return
         }
-        
         let current: BundleInfo = self.implementation.getCurrentBundle()
         let next: BundleInfo? = self.implementation.getNextBundle()
         
@@ -451,19 +531,19 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
         }
     }
     
-    private func toJson(object:Any) -> String {
+    @objc private func toJson(object:Any) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: []) else {
             return ""
         }
         return String(data: data, encoding: String.Encoding.utf8) ?? ""
     }
     
-    private func fromJsonArr(json:String) -> [Any] {
+    @objc private func fromJsonArr(json:String) -> [NSObject] {
         let jsonData = json.data(using: .utf8)!
         let object = try? JSONSerialization.jsonObject(
             with: jsonData,
-            options: []
-        ) as? [Any]
+            options: .mutableContainers
+        ) as? [NSObject]
         return object ?? []
     }
 }
