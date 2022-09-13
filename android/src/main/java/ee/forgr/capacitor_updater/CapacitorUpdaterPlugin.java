@@ -427,13 +427,26 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
                 call.reject("setMultiDelay called without delayCondition");
                 return;
             }
-            this.editor.putString(DELAY_CONDITION_PREFERENCES, delayConditions.toString());
-            this.editor.commit();
-            Log.i(CapacitorUpdater.TAG, "Delay update saved");
-            call.resolve();
+            if (_setMultiDelay(delayConditions.toString())){
+                call.resolve();
+            }else {
+                call.reject("Failed to delay update");
+            }
         } catch (final Exception e) {
             Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
             call.reject("Failed to delay update", e);
+        }
+    }
+
+    private Boolean _setMultiDelay(String delayConditions) {
+        try {
+            this.editor.putString(DELAY_CONDITION_PREFERENCES, delayConditions);
+            this.editor.commit();
+            Log.i(CapacitorUpdater.TAG, "Delay update saved");
+            return true;
+        } catch (final Exception e) {
+            Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
+            return false;
         }
     }
 
@@ -443,10 +456,12 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
         try {
             DelayUntilNext kind = DelayUntilNext.valueOf(call.getString("kind"));
             String value = call.getString("value");
-            JSONObject json = new JSONObject(new JSONTokener("{\"delayConditions\":[{\"kind\":\"" + kind + "\", \"value\":\"" + (value != null ? value : "") + "\"}]}"));
-            JSObject fromJSONObject = JSObject.fromJSONObject(json);
-            call.resolve(fromJSONObject);
-            setMultiDelay(call);
+            String delayConditions = "[{\"kind\":\"" + kind + "\", \"value\":\"" + (value != null ? value : "") + "\"}]";
+            if (_setMultiDelay(delayConditions)){
+                call.resolve();
+            }else {
+                call.reject("Failed to delay update");
+            }
         } catch (final Exception e) {
             Log.e(CapacitorUpdater.TAG, "Failed to delay update", e);
             call.reject("Failed to delay update", e);
@@ -775,10 +790,10 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             }
         }
     }
-    
+
     @Override
     public void onActivityResumed(@NonNull final Activity activity) {
-        if(backgroundTask != null) {
+        if (backgroundTask != null) {
             backgroundTask.cancel();
             Log.i(CapacitorUpdater.TAG, "Background Timer Task canceled, Activity resumed before timer completes");
         }
