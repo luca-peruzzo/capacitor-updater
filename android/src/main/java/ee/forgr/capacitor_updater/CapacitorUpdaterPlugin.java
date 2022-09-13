@@ -455,7 +455,7 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
     @PluginMethod
     public void setDelay(final PluginCall call) {
         try {
-            DelayUntilNext kind = DelayUntilNext.valueOf(call.getString("kind"));
+            String kind = call.getString("kind");
             String value = call.getString("value");
             String delayConditions = "[{\"kind\":\"" + kind + "\", \"value\":\"" + (value != null ? value : "") + "\"}]";
             if (_setMultiDelay(delayConditions)) {
