@@ -61,6 +61,8 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
     private String updateUrl = "";
     private Version currentVersionNative;
     private Boolean resetWhenUpdate = true;
+    private Timer backgroundTimer = new Timer();
+    private TimerTask backgroundTask;
 
     private volatile Thread appReadyCheck;
 
@@ -672,21 +674,21 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             }.getType();
             ArrayList<DelayCondition> delayConditionList = gson.fromJson(delayUpdatePreferences, type);
             String backgroundValue = null;
-            for(DelayCondition delayCondition : delayConditionList) {
-                if(delayCondition.getKind().toString().equals("background")) {
+            for (DelayCondition delayCondition : delayConditionList) {
+                if (delayCondition.getKind().toString().equals("background")) {
                     String value = delayCondition.getValue();
                     backgroundValue = (value != null || !value.equals("")) ? value : "0";
                 }
             }
-            if(backgroundValue != null) {
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
+            if (backgroundValue != null) {
+                backgroundTask = new TimerTask() {
                     @Override
                     public void run() {
                         _checkCancelDelay(false);
                         installNext();
                     }
-                }, Long.parseLong(backgroundValue));
+                };
+                backgroundTimer.schedule(backgroundTask, Long.parseLong(backgroundValue));
             } else {
                 this._checkCancelDelay(false);
                 this.installNext();
@@ -773,11 +775,13 @@ public class CapacitorUpdaterPlugin extends Plugin implements Application.Activi
             }
         }
     }
-
-    // not use but necessary here to remove warnings
+    
     @Override
     public void onActivityResumed(@NonNull final Activity activity) {
-        // TODO: Implement background updating based on `backgroundUpdate` and `backgroundUpdateDelay` capacitor.config.ts settings
+        if(backgroundTask != null) {
+            backgroundTask.cancel();
+            Log.i(CapacitorUpdater.TAG, "Background Timer Task canceled, Activity resumed before timer completes");
+        }
     }
 
     @Override
