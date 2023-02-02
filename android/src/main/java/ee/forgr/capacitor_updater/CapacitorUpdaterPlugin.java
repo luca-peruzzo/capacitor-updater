@@ -50,6 +50,8 @@ public class CapacitorUpdaterPlugin
   private final String PLUGIN_VERSION = "4.17.13";
   private static final String DELAY_CONDITION_PREFERENCES = "";
 
+  private static final String PREVENT_UPDATE = "false";
+
   private SharedPreferences.Editor editor;
   private SharedPreferences prefs;
   private CapacitorUpdater implementation;
@@ -616,6 +618,36 @@ public class CapacitorUpdaterPlugin
   }
 
   @PluginMethod
+  public void preventUpdate(final PluginCall call){
+    try {
+      final Boolean prevent = call.getData().optBoolean("preventUpdate", false);
+      _preventUpdate(prevent);
+      call.resolve();
+    } catch (final Exception e) {
+      Log.e(
+              CapacitorUpdater.TAG,
+              "Failed to prevent update, [Error calling 'preventUpdate()']",
+              e
+      );
+      call.reject("Failed to prevent update", e);
+    }
+  }
+
+  private void _preventUpdate(Boolean preventUpdate){
+    try {
+      this.editor.putBoolean(PREVENT_UPDATE, preventUpdate);
+      this.editor.commit();
+      Log.i(CapacitorUpdater.TAG, "Prevent update saved, value: " + preventUpdate);
+    } catch (final Exception e) {
+      Log.e(
+              CapacitorUpdater.TAG,
+              "Failed to prevent update, [Error calling '_preventUpdate()']",
+              e
+      );
+    }
+  }
+
+  @PluginMethod
   public void setMultiDelay(final PluginCall call) {
     try {
       final Object delayConditions = call.getData().opt("delayConditions");
@@ -1028,7 +1060,10 @@ public class CapacitorUpdaterPlugin
 
   @Override // appMovedToForeground
   public void onActivityStarted(@NonNull final Activity activity) {
-    this._checkCancelDelay(true);
+    Boolean preventUpdate = prefs.getBoolean(PREVENT_UPDATE, false);
+    if(!preventUpdate) {
+      this._checkCancelDelay(true);
+    }
     if (CapacitorUpdaterPlugin.this._isAutoUpdateEnabled()) {
       this.backgroundDownload();
     }
@@ -1044,47 +1079,52 @@ public class CapacitorUpdaterPlugin
         DELAY_CONDITION_PREFERENCES,
         "[]"
       );
-      Type type = new TypeToken<ArrayList<DelayCondition>>() {}.getType();
-      ArrayList<DelayCondition> delayConditionList = gson.fromJson(
-        delayUpdatePreferences,
-        type
-      );
-      String backgroundValue = null;
-      for (DelayCondition delayCondition : delayConditionList) {
-        if (delayCondition.getKind().toString().equals("background")) {
-          String value = delayCondition.getValue();
-          backgroundValue = (value != null && !value.isEmpty()) ? value : "0";
+      Boolean preventUpdate = prefs.getBoolean(PREVENT_UPDATE, false);
+
+      if(!preventUpdate) {
+        Type type = new TypeToken<ArrayList<DelayCondition>>() {
+        }.getType();
+        ArrayList<DelayCondition> delayConditionList = gson.fromJson(
+                delayUpdatePreferences,
+                type
+        );
+        String backgroundValue = null;
+        for (DelayCondition delayCondition : delayConditionList) {
+          if (delayCondition.getKind().toString().equals("background")) {
+            String value = delayCondition.getValue();
+            backgroundValue = (value != null && !value.isEmpty()) ? value : "0";
+          }
         }
-      }
-      if (backgroundValue != null) {
-        taskRunning = true;
-        final Long timeout = Long.parseLong(backgroundValue);
-        if (backgroundTask != null) {
-          backgroundTask.interrupt();
-        }
-        backgroundTask =
-          new Thread(
-            new Runnable() {
-              @Override
-              public void run() {
-                try {
-                  Thread.sleep(timeout);
-                  taskRunning = false;
-                  _checkCancelDelay(false);
-                  installNext();
-                } catch (InterruptedException e) {
-                  Log.i(
-                    CapacitorUpdater.TAG,
-                    "Background Task canceled, Activity resumed before timer completes"
+        if (backgroundValue != null) {
+          taskRunning = true;
+          final Long timeout = Long.parseLong(backgroundValue);
+          if (backgroundTask != null) {
+            backgroundTask.interrupt();
+          }
+          backgroundTask =
+                  new Thread(
+                          new Runnable() {
+                            @Override
+                            public void run() {
+                              try {
+                                Thread.sleep(timeout);
+                                taskRunning = false;
+                                _checkCancelDelay(false);
+                                installNext();
+                              } catch (InterruptedException e) {
+                                Log.i(
+                                        CapacitorUpdater.TAG,
+                                        "Background Task canceled, Activity resumed before timer completes"
+                                );
+                              }
+                            }
+                          }
                   );
-                }
-              }
-            }
-          );
-        backgroundTask.start();
-      } else {
-        this._checkCancelDelay(false);
-        this.installNext();
+          backgroundTask.start();
+        } else {
+          this._checkCancelDelay(false);
+          this.installNext();
+        }
       }
     } catch (final Exception e) {
       Log.e(CapacitorUpdater.TAG, "Error during onActivityStopped", e);

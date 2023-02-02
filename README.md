@@ -141,6 +141,7 @@ Capacitor Updator works by unzipping a compiled app bundle to the native device 
 * [`current()`](#current)
 * [`reload()`](#reload)
 * [`setMultiDelay(...)`](#setmultidelay)
+* [`preventUpdate(...)`](#preventupdate)
 * [`setDelay(...)`](#setdelay)
 * [`cancelDelay()`](#canceldelay)
 * [`getLatest()`](#getlatest)
@@ -158,6 +159,8 @@ Capacitor Updator works by unzipping a compiled app bundle to the native device 
 * [`getDeviceId()`](#getdeviceid)
 * [`getPluginVersion()`](#getpluginversion)
 * [`isAutoUpdateEnabled()`](#isautoupdateenabled)
+* [`addListener(string, ...)`](#addlistenerstring)
+* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 
@@ -182,14 +185,14 @@ Notify Capacitor Updater that the current bundle is working (a rollback will occ
 ### download(...)
 
 ```typescript
-download(options: { url: string; version: string; }) => Promise<BundleInfo>
+download(options: { url: string; version: string; sessionKey?: string; checksum?: string; }) => Promise<BundleInfo>
 ```
 
 Download a new bundle from the provided URL, it should be a zip file, with files inside or with a unique id inside with all your files
 
-| Param         | Type                                           |
-| ------------- | ---------------------------------------------- |
-| **`options`** | <code>{ url: string; version: string; }</code> |
+| Param         | Type                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ url: string; version: string; sessionKey?: string; checksum?: string; }</code> |
 
 **Returns:** <code>Promise&lt;<a href="#bundleinfo">BundleInfo</a>&gt;</code>
 
@@ -308,6 +311,26 @@ Set <a href="#delaycondition">DelayCondition</a>, skip updates until one of the 
 | **`options`** | <code>{ delayConditions: DelayCondition[]; }</code> | are the {@link <a href="#delaycondition">DelayCondition</a>} list to set |
 
 **Since:** 4.3.0
+
+--------------------
+
+
+### preventUpdate(...)
+
+```typescript
+preventUpdate(options: { preventUpdate: boolean; }) => void
+```
+
+Prevent next update when delay condition is met
+
+When you set multiDelay with delayConditins including 'kill', and you have to start an other Activity
+(like calling Capacitor Camera), android stops your app activity. This triggers the kill condition 
+and updates your app if there's a pending bundle.
+Set it manually to false after your other activity has completed
+
+| Param         | Type                                     | Description                                           |
+| ------------- | ---------------------------------------- | ----------------------------------------------------- |
+| **`options`** | <code>{ preventUpdate: boolean; }</code> | set preventUpdate to true for prevent the next update |
 
 --------------------
 
@@ -603,6 +626,31 @@ isAutoUpdateEnabled() => Promise<{ enabled: boolean; }>
 Get the state of auto update config. This will return `false` in manual mode.
 
 **Returns:** <code>Promise&lt;{ enabled: boolean; }&gt;</code>
+
+--------------------
+
+
+### addListener(string, ...)
+
+```typescript
+addListener(eventName: string, listenerFunc: (...args: any[]) => any) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                    |
+| ------------------ | --------------------------------------- |
+| **`eventName`**    | <code>string</code>                     |
+| **`listenerFunc`** | <code>(...args: any[]) =&gt; any</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => Promise<void>
+```
 
 --------------------
 

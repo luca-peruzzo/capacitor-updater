@@ -21,8 +21,7 @@ const BUNDLE_BUILTIN: BundleInfo = {
 
 export class CapacitorUpdaterWeb
   extends WebPlugin
-  implements CapacitorUpdaterPlugin
-{
+  implements CapacitorUpdaterPlugin {
   async download(options: {
     url: string;
     version?: string;
@@ -110,6 +109,10 @@ export class CapacitorUpdaterWeb
   }
   async cancelDelay(): Promise<void> {
     console.warn("Cannot cancelDelay in web");
+    return;
+  }
+  preventUpdate(options: { preventUpdate: boolean }): void {
+    console.warn("Cannot prevent update in web", options?.preventUpdate);
     return;
   }
 }

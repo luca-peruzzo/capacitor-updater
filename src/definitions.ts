@@ -330,6 +330,25 @@ export interface CapacitorUpdaterPlugin {
   setMultiDelay(options: { delayConditions: DelayCondition[] }): Promise<void>;
 
   /**
+   * Prevent next update when delay condition is met
+   * 
+   * When you set multiDelay with delayConditins including 'kill', and you have to start an other Activity
+   * (like calling Capacitor Camera), android stops your app activity. This triggers the kill condition 
+   * and updates your app if there's a pending bundle.
+   * Set it manually to false after your other activity has completed
+   * 
+   * @example
+   * CapacitorUpdater.preventUpdate(true);
+   * Camera.getPhoto(options).then(photo => {
+   *   CapacitorUpdater.preventUpdate(false);
+   *   // your stuff
+   * })
+   * 
+   * @param options set preventUpdate to true for prevent the next update 
+   */
+  preventUpdate(options: { preventUpdate: boolean }): void;
+
+  /**
    * Set DelayCondition, skip updates until the condition is met
    *
    * @deprecated use setMultiDelay instead passing a single value in array
