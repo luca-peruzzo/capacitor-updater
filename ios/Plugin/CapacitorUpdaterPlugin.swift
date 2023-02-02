@@ -326,14 +326,14 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
             call.reject("Failed to delay update")
         }
     }
-    
-    @objc func preventUpdate(_ call: CAPPluginCall){
-        let preventUpdate = call.getBool("preventUpdate", false);
+
+    @objc func preventUpdate(_ call: CAPPluginCall) {
+        let preventUpdate = call.getBool("preventUpdate", false)
         _preventUpdate(preventUpdate: preventUpdate)
-        call.resolve();
+        call.resolve()
     }
-    
-    private func _preventUpdate(preventUpdate: Bool){
+
+    private func _preventUpdate(preventUpdate: Bool) {
         UserDefaults.standard.set(preventUpdate, forKey: PREVENT_UPDATE)
         UserDefaults.standard.synchronize()
         print("\(self.implementation.TAG) Prevent update saved, value: \(preventUpdate)")
@@ -598,7 +598,7 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
         print("\(self.implementation.TAG) Check for pending update")
         let delayUpdatePreferences = UserDefaults.standard.string(forKey: DELAY_CONDITION_PREFERENCES) ?? "[]"
         let preventUpdate = UserDefaults.standard.bool(forKey: PREVENT_UPDATE)
-        if(!preventUpdate) {
+        if !preventUpdate {
             let delayConditionList: [DelayCondition] = fromJsonArr(json: delayUpdatePreferences).map { obj -> DelayCondition in
                 let kind: String = obj.value(forKey: "kind") as! String
                 let value: String? = obj.value(forKey: "value") as? String
@@ -631,7 +631,7 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
 
     @objc func appKilled() {
         let preventUpdate = UserDefaults.standard.bool(forKey: PREVENT_UPDATE)
-        if(!preventUpdate) {
+        if !preventUpdate {
             self._checkCancelDelay(killed: true)
         }
     }

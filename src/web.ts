@@ -21,7 +21,8 @@ const BUNDLE_BUILTIN: BundleInfo = {
 
 export class CapacitorUpdaterWeb
   extends WebPlugin
-  implements CapacitorUpdaterPlugin {
+  implements CapacitorUpdaterPlugin
+{
   async download(options: {
     url: string;
     version?: string;

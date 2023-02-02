@@ -618,31 +618,34 @@ public class CapacitorUpdaterPlugin
   }
 
   @PluginMethod
-  public void preventUpdate(final PluginCall call){
+  public void preventUpdate(final PluginCall call) {
     try {
       final Boolean prevent = call.getData().optBoolean("preventUpdate", false);
       _preventUpdate(prevent);
       call.resolve();
     } catch (final Exception e) {
       Log.e(
-              CapacitorUpdater.TAG,
-              "Failed to prevent update, [Error calling 'preventUpdate()']",
-              e
+        CapacitorUpdater.TAG,
+        "Failed to prevent update, [Error calling 'preventUpdate()']",
+        e
       );
       call.reject("Failed to prevent update", e);
     }
   }
 
-  private void _preventUpdate(Boolean preventUpdate){
+  private void _preventUpdate(Boolean preventUpdate) {
     try {
       this.editor.putBoolean(PREVENT_UPDATE, preventUpdate);
       this.editor.commit();
-      Log.i(CapacitorUpdater.TAG, "Prevent update saved, value: " + preventUpdate);
+      Log.i(
+        CapacitorUpdater.TAG,
+        "Prevent update saved, value: " + preventUpdate
+      );
     } catch (final Exception e) {
       Log.e(
-              CapacitorUpdater.TAG,
-              "Failed to prevent update, [Error calling '_preventUpdate()']",
-              e
+        CapacitorUpdater.TAG,
+        "Failed to prevent update, [Error calling '_preventUpdate()']",
+        e
       );
     }
   }
@@ -1061,7 +1064,7 @@ public class CapacitorUpdaterPlugin
   @Override // appMovedToForeground
   public void onActivityStarted(@NonNull final Activity activity) {
     Boolean preventUpdate = prefs.getBoolean(PREVENT_UPDATE, false);
-    if(!preventUpdate) {
+    if (!preventUpdate) {
       this._checkCancelDelay(true);
     }
     if (CapacitorUpdaterPlugin.this._isAutoUpdateEnabled()) {
@@ -1081,12 +1084,11 @@ public class CapacitorUpdaterPlugin
       );
       Boolean preventUpdate = prefs.getBoolean(PREVENT_UPDATE, false);
 
-      if(!preventUpdate) {
-        Type type = new TypeToken<ArrayList<DelayCondition>>() {
-        }.getType();
+      if (!preventUpdate) {
+        Type type = new TypeToken<ArrayList<DelayCondition>>() {}.getType();
         ArrayList<DelayCondition> delayConditionList = gson.fromJson(
-                delayUpdatePreferences,
-                type
+          delayUpdatePreferences,
+          type
         );
         String backgroundValue = null;
         for (DelayCondition delayCondition : delayConditionList) {
@@ -1102,24 +1104,24 @@ public class CapacitorUpdaterPlugin
             backgroundTask.interrupt();
           }
           backgroundTask =
-                  new Thread(
-                          new Runnable() {
-                            @Override
-                            public void run() {
-                              try {
-                                Thread.sleep(timeout);
-                                taskRunning = false;
-                                _checkCancelDelay(false);
-                                installNext();
-                              } catch (InterruptedException e) {
-                                Log.i(
-                                        CapacitorUpdater.TAG,
-                                        "Background Task canceled, Activity resumed before timer completes"
-                                );
-                              }
-                            }
-                          }
-                  );
+            new Thread(
+              new Runnable() {
+                @Override
+                public void run() {
+                  try {
+                    Thread.sleep(timeout);
+                    taskRunning = false;
+                    _checkCancelDelay(false);
+                    installNext();
+                  } catch (InterruptedException e) {
+                    Log.i(
+                      CapacitorUpdater.TAG,
+                      "Background Task canceled, Activity resumed before timer completes"
+                    );
+                  }
+                }
+              }
+            );
           backgroundTask.start();
         } else {
           this._checkCancelDelay(false);
