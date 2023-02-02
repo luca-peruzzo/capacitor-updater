@@ -324,7 +324,7 @@ preventUpdate(options: { preventUpdate: boolean; }) => void
 Prevent next update when delay condition is met
 
 When you set multiDelay with delayConditins including 'kill', and you have to start an other Activity
-(like calling Capacitor Camera), android stops your app activity. This triggers the kill condition 
+(like calling Capacitor Camera), android stops your app activity. This triggers the kill condition
 and updates your app if there's a pending bundle.
 Set it manually to false after your other activity has completed
 
