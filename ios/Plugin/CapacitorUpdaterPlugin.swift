@@ -271,16 +271,16 @@ public class CapacitorUpdaterPlugin: CAPPlugin {
     @objc func _reset(toLastSuccessful: Bool) -> Bool {
         guard let bridge = self.bridge else { return false }
 
-        if ((bridge.viewController as? CAPBridgeViewController) != nil) {
+        if (bridge.viewController as? CAPBridgeViewController) != nil {
             let fallback: BundleInfo = self.implementation.getFallbackBundle()
-            
+
             // If developer wants to reset to the last successful bundle, and that bundle is not
             // the built-in bundle, set it as the bundle to use and reload.
             if toLastSuccessful && !fallback.isBuiltin() {
                 print("\(self.implementation.TAG) Resetting to: \(fallback.toString())")
                 return self.implementation.set(bundle: fallback) && self._reload()
             }
-            
+
             // Otherwise, reset back to the built-in bundle and reload.
             self.implementation.reset()
             return self._reload()
