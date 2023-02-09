@@ -198,7 +198,7 @@ public class CapacitorUpdater {
           );
         }
 
-        final int newPercent = (int) ((bytesRead / (float)totalLength) * 100);
+        final int newPercent = (int) ((lengthRead / (float)lengthTotal) * 100);
         if (lengthTotal > 1 && newPercent != percent) {
           percent = newPercent;
           this.notifyDownload(id, this.calcTotalPercent(percent, 75, 90));
